@@ -1,0 +1,10 @@
+-- 特定時点のバックアップに含まれるチェストの位置情報
+CREATE TABLE Chests (
+    chest_id SERIAL PRIMARY KEY,            -- 主キー (PK): 自動採番ID
+    world_snapshot_id INT NOT NULL,         -- 外部キー (FK): どのバックアップデータかを参照 (WorldSnapshots.world_snapshot_id)
+    x_coord INT NOT NULL,                   -- X座標
+    y_coord INT NOT NULL,                   -- Y座標
+    z_coord INT NOT NULL,                   -- Z座標
+    -- FOREIGN KEY 制約: world_snapshot_id が WorldSnapshots テーブルに存在することを保証
+    FOREIGN KEY (world_snapshot_id) REFERENCES WorldSnapshots (world_snapshot_id)
+);

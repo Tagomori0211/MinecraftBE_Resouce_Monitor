@@ -1,0 +1,6 @@
+-- マイクラのアイテムマスタデータ
+CREATE TABLE Items (
+    item_id VARCHAR(255) PRIMARY KEY, -- 主キー (PK): マイクラの内部ID (例: 'minecraft:iron_ingot')
+    item_name_jp VARCHAR(255) NOT NULL, -- 日本語名 (例: '鉄インゴット')
+    item_category VARCHAR(100)          -- 分類 (例: '鉱石', '食料')
+);

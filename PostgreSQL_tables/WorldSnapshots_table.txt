@@ -1,0 +1,6 @@
+-- どの時点のワールドデータか（バックアップ日時）を管理する
+CREATE TABLE WorldSnapshots (
+    world_snapshot_id SERIAL PRIMARY KEY, -- 主キー (PK): 自動採番ID
+    snapshot_date TIMESTAMP NOT NULL,    -- バックアップが取られた日時
+    world_name VARCHAR(255)              -- どのワールドのバックアップか（例: "メインワールド"）
+);

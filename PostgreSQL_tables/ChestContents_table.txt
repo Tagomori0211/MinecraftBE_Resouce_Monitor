@@ -1,0 +1,11 @@
+-- チェストに格納されているアイテムとその数量
+CREATE TABLE ChestContents (
+    content_id SERIAL PRIMARY KEY,      -- 主キー (PK): 自動採番ID
+    chest_id INT NOT NULL,              -- 外部キー (FK): どのチェストかを参照 (Chests.chest_id)
+    item_id VARCHAR(255) NOT NULL,      -- 外部キー (FK): 何のアイテムかを参照 (Items.item_id)
+    quantity INT NOT NULL,              -- 数量 (個数)
+
+    -- FOREIGN KEY 制約: 
+    FOREIGN KEY (chest_id) REFERENCES Chests (chest_id),
+    FOREIGN KEY (item_id) REFERENCES Items (item_id)
+);
