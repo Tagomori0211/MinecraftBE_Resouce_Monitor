@@ -109,14 +109,18 @@
                 // 1. ステータス表示更新
                 const statusText = document.getElementById('status-text');
                 const statusIcon = document.getElementById('status-icon');
-                
+                const uptimeElement = document.getElementById('uptime');
+
                 statusText.textContent = data.status;
                 if (data.status === "Online") {
                     statusText.style.color = "#00E676";
                     statusIcon.className = "status-indicator status-online";
+                    // バージョン情報を表示！
+                    uptimeElement.textContent = "Ver: " + data.server.version; 
                 } else {
                     statusText.style.color = "#F44336";
                     statusIcon.className = "status-indicator status-offline";
+                    uptimeElement.textContent = "Checking...";
                 }
 
                 // 2. プレイヤー数更新
