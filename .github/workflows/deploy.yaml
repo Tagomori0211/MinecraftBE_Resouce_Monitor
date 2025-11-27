@@ -31,7 +31,7 @@ jobs:
     - name: Build and Deploy locally
       run: |
         # キャッシュを効かせずに再ビルドして起動
-        docker-compose up -d --build --remove-orphans
+        docker compose up -d --build --remove-orphans
         
         # 古いイメージのお掃除 (ディスク圧迫防止)
         docker image prune -f
