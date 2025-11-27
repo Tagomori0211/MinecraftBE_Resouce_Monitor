@@ -1,18 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minecraft Resource Monitor</title>
     <style>
-        body { font-family: sans-serif; background-color: #2d2d2d; color: #ffffff; text-align: center; padding: 50px; }
-        .card { background: #3d3d3d; padding: 20px; border-radius: 10px; display: inline-block; }
-        h1 { color: #4CAF50; }
+        /* 全体のスタイル定義 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2d2d2d; /* ダークモード背景 */
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ヘッダー部分 */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 { margin: 0; font-size: 2.5rem; color: #4CAF50; }
+        .subtitle { color: #aaaaaa; margin-top: 10px; }
+
+        /* グリッドレイアウト (カードを並べる) */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        /* パネル（カード）のデザイン */
+        .card {
+            background: #3d3d3d;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-5px); } /* マウスホバーで少し浮く */
+
+        .card h2 { font-size: 1.2rem; color: #81C784; margin-bottom: 10px; }
+        .card .value { font-size: 2.5rem; font-weight: bold; margin: 10px 0; }
+        .card .unit { font-size: 1rem; color: #bbbbbb; }
+
+        /* ステータスランプ */
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background-color: #gray;
+            margin-right: 5px;
+        }
+        .status-online { background-color: #00E676; box-shadow: 0 0 10px #00E676; }
+        .status-offline { background-color: #F44336; }
+
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>⛏️ Minecraft Resource Monitor 📊</h1>
-        <p>System Status: <strong>Online</strong></p>
-        <p>CI/CD Pipeline: <strong>Active</strong></p>
+
+    <header>
+        <h1>⛏️ Minecraft Monitor 📊</h1>
+        <div class="subtitle">DevOps VM Dashboard (Managed by Flask)</div>
+    </header>
+
+    <div class="dashboard-grid">
+        
+        <div class="card">
+            <h2>Server Status</h2>
+            <div id="status-text" class="value">Loading...</div>
+            <div><span id="status-icon" class="status-indicator"></span> <span id="uptime">Checking...</span></div>
+        </div>
+
+        <div class="card">
+            <h2>Players Online</h2>
+            <div class="value"><span id="players-online">-</span> <span class="unit">/ <span id="players-max">-</span></span></div>
+            <div class="unit">Steve & Alex</div>
+        </div>
+
+        <div class="card">
+            <h2>CPU Usage</h2>
+            <div class="value" id="cpu-usage">- %</div>
+            <div class="unit">Pod Resource</div>
+        </div>
+
+        <div class="card">
+            <h2>Memory Usage</h2>
+            <div class="value" id="mem-usage">- MB</div>
+            <div class="unit">RAM Allocation</div>
+        </div>
+
     </div>
+
+    <script>
+        // APIからデータを取得して画面を更新する関数
+        async function fetchStats() {
+            try {
+                // FlaskのAPIを叩く (/api/はNginxでFlaskに転送される設定済み)
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                // 1. ステータス表示更新
+                const statusText = document.getElementById('status-text');
+                const statusIcon = document.getElementById('status-icon');
+                
+                statusText.textContent = data.status;
+                if (data.status === "Online") {
+                    statusText.style.color = "#00E676";
+                    statusIcon.className = "status-indicator status-online";
+                } else {
+                    statusText.style.color = "#F44336";
+                    statusIcon.className = "status-indicator status-offline";
+                }
+
+                // 2. プレイヤー数更新
+                document.getElementById('players-online').textContent = data.players.online;
+                document.getElementById('players-max').textContent = data.players.max;
+
+                // 3. リソース情報更新
+                document.getElementById('cpu-usage').textContent = data.server.cpu_usage;
+                document.getElementById('mem-usage').textContent = data.server.memory_usage;
+
+            } catch (error) {
+                console.error("データの取得に失敗しました:", error);
+                document.getElementById('status-text').textContent = "Error";
+            }
+        }
+
+        // ページ読み込み時に1回実行
+        fetchStats();
+
+        // その後は5秒ごとに自動更新 (リアルタイム感！)
+        setInterval(fetchStats, 5000);
+    </script>
 </body>
 </html>
