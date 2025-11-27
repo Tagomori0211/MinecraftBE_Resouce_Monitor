@@ -29,6 +29,7 @@ def hello():
     # ヘルスチェック用
     return jsonify({"message": "Minecraft Monitor API OK", "status": "Running"})
 
+
 @app.route('/api/status')
 def get_status():
     # -------------------------------------------------
