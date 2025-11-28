@@ -55,7 +55,12 @@ def get_status():
     mem_query = 'sum(container_memory_working_set_bytes{container_label_io_kubernetes_container_name="minecraft"})'
     mem_res = query_prometheus(mem_query)
 
-    
+    # 【追加】メモリ上限 (Bytes)
+    # container_spec_memory_limit_bytes を取得
+    limit_query = 'sum(container_spec_memory_limit_bytes{container_label_io_kubernetes_container_name="minecraft"})'
+    limit_res = query_prometheus(limit_query)
+
+
     # -------------------------------------------------
     # 3. データの整形
     # -------------------------------------------------
@@ -83,15 +88,24 @@ def get_status():
     # CPU使用率の整形
     if cpu_res:
         val = float(cpu_res['value'][1])
-        # 小数点1桁まで
         cpu_usage = f"{val:.1f}%"
     
-    # メモリ使用量の整形 (Bytes -> MB)
+    # メモリ使用量の処理 (計算ロジック強化！)
     if mem_res:
-        val = float(mem_res['value'][1])
-        # 1MB = 1024 * 1024 bytes
-        mb_val = val / 1048576
-        mem_usage = f"{mb_val:.0f} MB"
+        mem_val = float(mem_res['value'][1])
+        # MB表記 (1MB = 1048576 bytes)
+        mem_usage_str = f"{mem_val / 1048576:.0f} MB"
+        
+    if limit_res:
+        limit_val = float(limit_res['value'][1])
+        # 上限はGB表記の方が見やすいかも (1GB = 1073741824 bytes)
+        # 4GiBなら "4.0 GB" と表示される
+        mem_limit_str = f"{limit_val / 1073741824:.1f} GB"
+
+    # パーセンテージ計算
+    if mem_val > 0 and limit_val > 0:
+        percent = (mem_val / limit_val) * 100
+        mem_percent_str = f"({percent:.1f}%)"
 
     # -------------------------------------------------
     # 4. レスポンス (JSON)
@@ -105,7 +119,10 @@ def get_status():
         "server": {
             "version": version,
             "cpu_usage": cpu_usage,
-            "memory_usage": mem_usage
+            # メモリ情報をリッチにする
+            "memory_usage": mem_usage_str,
+            "memory_limit": mem_limit_str,
+            "memory_percent": mem_percent_str
         }
     })
 
