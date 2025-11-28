@@ -93,7 +93,7 @@
         <div class="card">
             <h2>Memory Usage</h2>
             <div class="value" id="mem-usage">- MB</div>
-            <div class="unit">RAM Allocation</div>
+            <div class="unit" id="mem-details">RAM Allocation</div>
         </div>
 
     </div>
@@ -129,8 +129,20 @@
 
                 // 3. リソース情報更新
                 document.getElementById('cpu-usage').textContent = data.server.cpu_usage;
+                
+                // メモリ情報の更新 (リッチ表示！)
                 document.getElementById('mem-usage').textContent = data.server.memory_usage;
-
+                
+                // "RAM Allocation" の部分を " / 4.0 GB (7.9%)" に書き換える
+                const memDetails = document.getElementById('mem-details');
+                if (data.server.memory_limit !== "N/A") {
+                    memDetails.textContent = "/ " + data.server.memory_limit + " " + data.server.memory_percent;
+                    // ちょっと文字色を変えてアクセントをつけるのもGood
+                    memDetails.style.color = "#81C784"; 
+                } else {
+                    memDetails.textContent = "RAM Allocation";
+                    memDetails.style.color = "#bbbbbb";
+                }
             } catch (error) {
                 console.error("データの取得に失敗しました:", error);
                 document.getElementById('status-text').textContent = "Error";
