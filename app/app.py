@@ -45,14 +45,17 @@ def get_status():
     # -------------------------------------------------
     # 2. システム負荷情報の取得 (cAdvisor)
     # -------------------------------------------------
-    # CPU使用率 (%)  labelを name -> container に変更
-    cpu_query = 'sum(rate(container_cpu_usage_seconds_total{container=~".*minecraft.*"}[1m])) * 100'
+    # CPU使用率 (%)
+    # 生データに合わせてラベル名を修正
+    cpu_query = 'sum(rate(container_cpu_usage_seconds_total{container_label_io_kubernetes_container_name="minecraft"}[1m])) * 100'
     cpu_res = query_prometheus(cpu_query)
 
-    # メモリ使用量 (Bytes) labelを name -> container に変更
-    mem_query = 'sum(container_memory_working_set_bytes{container=~".*minecraft.*"})'
+    # メモリ使用量 (Bytes)
+    # 生データに合わせてラベル名を修正
+    mem_query = 'sum(container_memory_working_set_bytes{container_label_io_kubernetes_container_name="minecraft"})'
     mem_res = query_prometheus(mem_query)
 
+    
     # -------------------------------------------------
     # 3. データの整形
     # -------------------------------------------------

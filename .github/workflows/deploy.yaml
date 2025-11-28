@@ -9,37 +9,43 @@ on:
 
 jobs:
   deploy_on_premise:
-    # 自宅サーバーのランナーを指定
     runs-on: [self-hosted, Linux] 
     steps:
-    # 1. コードの取得
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 2. 環境変数のセットアップ
-    # 【重要】GitHubの Settings > Secrets にこれらを登録しておくこと！
+    # --- 既存のDockerデプロイ ---
     - name: Create .env file
       run: |
         echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> .env
         echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
         echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> .env
-        # Flask用の秘密鍵も追加しておくとGood
         echo "FLASK_APP_SECRET_KEY=${{ secrets.FLASK_APP_SECRET_KEY }}" >> .env
 
-    # 3. Docker Compose でビルド & 起動
-    - name: Build and Deploy locally
+    - name: Build and Deploy Dashboard (Docker)
       run: |
-        # コマンドは「ハイフンなし」に統一！
         docker compose up -d --build --remove-orphans
-        
-        # 不要なイメージ削除
         docker image prune -f
 
-    # 4. データ取り込み処理 (一旦無効化！)
-    # main.pyが無限ループする状態なので、実行するとパイプラインが止まってしまいます。
-    # 解析ロジックが完成するまでコメントアウトしておきます。
-    # - name: Trigger data ingestion
-    #   if: github.event_name == 'repository_dispatch' && github.event.action == 'new-minecraft-backup'
-    #   run: |
-    #     # ハイフンなしに修正 & スクリプト名を修正
-    #     docker compose run --rm parser python /app/main.py
+    # --- 【追加】K3sへの自動デプロイ ---
+    # DevOps VMのRunnerから、MCBE VMのK3sを操作する
+    - name: Deploy to K3s (Minecraft Server)
+      env:
+        # GitHub Secretsに登録した kubeconfig をファイルに書き出す
+        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+      run: |
+        # .kubeディレクトリを作成
+        mkdir -p ~/.kube
+        
+        # Base64エンコードされた設定をデコードして保存
+        echo "$KUBE_CONFIG_DATA" | base64 -d > ~/.kube/config
+        
+        # 権限を厳しくする（kubectlが怒らないように）
+        chmod 600 ~/.kube/config
+        
+        # cAdvisorのマニフェストを適用！
+        echo "🚀 Applying cAdvisor manifest to K3s..."
+        kubectl apply -f MCBEs/cadvisor.yaml
+        
+        # 設定変更を確実にするためPodを再作成
+        kubectl delete pods -l app=cadvisor --ignore-not-found=true
