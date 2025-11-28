@@ -86,6 +86,10 @@ services:
       # 2. 匿名アクセスを許可 (ログイン画面を出さないため)
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      # ↓↓↓ 【追加】サブパス設定 ↓↓↓
+      - GF_SERVER_DOMAIN=tagomori-monitor.duckdns.org
+      - GF_SERVER_ROOT_URL=http://tagomori-monitor.duckdns.org/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     depends_on:
       - prometheus
     restart: unless-stopped
