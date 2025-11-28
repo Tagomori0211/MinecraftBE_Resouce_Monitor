@@ -34,18 +34,18 @@ jobs:
         # GitHub Secretsに登録した kubeconfig をファイルに書き出す
         KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
       run: |
-        # .kubeディレクトリを作成
+        # 1. kubectl ツールの調達 (Runnerにない場合を想定してDLする)
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        
+        # 2. .kubeディレクトリを作成 & 設定配置
         mkdir -p ~/.kube
-        
-        # Base64エンコードされた設定をデコードして保存
         echo "$KUBE_CONFIG_DATA" | base64 -d > ~/.kube/config
-        
-        # 権限を厳しくする（kubectlが怒らないように）
         chmod 600 ~/.kube/config
         
-        # cAdvisorのマニフェストを適用！
+        # 3. cAdvisorのマニフェストを適用！ (./kubectl で実行)
         echo "🚀 Applying cAdvisor manifest to K3s..."
-        kubectl apply -f MCBEs/cadvisor.yaml
+        ./kubectl apply -f MCBEs/cadvisor.yaml
         
-        # 設定変更を確実にするためPodを再作成
-        kubectl delete pods -l app=cadvisor --ignore-not-found=true
+        # 4. 設定変更を確実にするためPodを再作成
+        ./kubectl delete pods -l app=cadvisor --ignore-not-found=true
