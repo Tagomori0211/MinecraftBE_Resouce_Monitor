@@ -22,30 +22,32 @@
 
 インフラの再現性と耐障害性(Disaster Recovery)を担保するため、以下の3段階のIaCパイプラインを実装しています。
 
-graph TD  
-    subgraph "Phase 1: Provisioning (Infrastructure)"  
-        TF\[Terraform\] \--\>|Proxmox API| PVE\[Proxmox VE Host\]  
-        PVE \--\>|Create| VM1\[VM: DevOps Core\]  
-        PVE \--\>|Create| VM2\[VM: App Server\]  
-        style TF fill:\#7B42BC,stroke:\#fff,color:\#fff  
+```mermaid
+graph TD
+    subgraph "Phase 1: Provisioning (Infrastructure)"
+        TF[Terraform] -->|Proxmox API| PVE[Proxmox VE Host]
+        PVE -->|Create| VM1[VM: DevOps Core]
+        PVE -->|Create| VM2[VM: App Server]
+        style TF fill:#7B42BC,stroke:#fff,color:#fff
     end
 
-    subgraph "Phase 2: Configuration (OS/Middleware)"  
-        ANS\[Ansible\] \--\>|SSH Config| VM1  
-        ANS \--\>|SSH Config| VM2  
-        VM1 \--\>|Install| Docker\[Docker / Runners\]  
-        VM2 \--\>|Install| K3s\[K3s Cluster\]  
-        style ANS fill:\#EE0000,stroke:\#fff,color:\#fff  
+    subgraph "Phase 2: Configuration (OS/Middleware)"
+        ANS[Ansible] -->|SSH Config| VM1
+        ANS -->|SSH Config| VM2
+        VM1 -->|Install| Docker[Docker / Runners]
+        VM2 -->|Install| K3s[K3s Cluster]
+        style ANS fill:#EE0000,stroke:#fff,color:#fff
     end
 
-    subgraph "Phase 3: Orchestration (Application)"  
-        K8S\[Kubernetes Manifests\] \--\>|Apply| K3s  
-        K3s \--\>|Deploy| POD\_MC\[Minecraft App\]  
-        K3s \--\>|Deploy| POD\_EXP\[Exporter / Sidecars\]  
-        style K8S fill:\#326CE5,stroke:\#fff,color:\#fff  
+    subgraph "Phase 3: Orchestration (Application)"
+        K8S[Kubernetes Manifests] -->|Apply| K3s
+        K3s -->|Deploy| POD_MC[Minecraft App]
+        K3s -->|Deploy| POD_EXP[Exporter / Sidecars]
+        style K8S fill:#326CE5,stroke:#fff,color:#fff
     end
 
-    TF \--\> ANS \--\> K8S
+    'TF --> ANS --> K8S'
+```
 
 #### **🛡️ ハイブリッド・データセキュリティ設計**
 
@@ -111,14 +113,9 @@ graph TD
   * Python解析エンジンの実装とPostgreSQLへのデータ蓄積。  
   * Grafana/Web UIによるリソースダッシュボードの公開。
 
-### **👤 Author Information**
-
-Name: Shinari (Tagomori0211)  
-Location: Kitakyushu, Fukuoka, Japan (Kokura)  
-Role: Aspiring Infrastructure / DevOps Engineer  
+### **👤 Information**
 Mission:  
-
 物理ハードウェア（自作サーバー、10Gネットワーク）の構築経験と、モダンなクラウドネイティブ技術（K8s, IaC）を融合させ、現場で本当に使えるDX基盤の構築を目指しています。  
-Contact:  
-GitHub Profile | LinkedIn  
+Contact:tagomoriyuukichi@gmail.com 
+GitHub Profile
 *This project is a technical showcase for job application purposes.*
