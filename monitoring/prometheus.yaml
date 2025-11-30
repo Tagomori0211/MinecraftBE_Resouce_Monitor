@@ -11,9 +11,15 @@ data:
     scrape_configs:
       # Minecraft Bedrock Exporter (mc-monitor)
       - job_name: 'minecraft'
-        static_configs:
+          static_configs:
           # Serviceで開けた8080番を見に行く
           - targets: ['mc-bedrock-svc:8080']
+      
+      - job_name: 'minecraft-log-exporter'
+          static_configs:
+          - targets: ['192.168.0.20:30003']
+        labels:
+          group: 'activity-stats'
 
 ---
 apiVersion: apps/v1

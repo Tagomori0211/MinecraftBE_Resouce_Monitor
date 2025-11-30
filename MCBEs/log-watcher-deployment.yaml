@@ -1,3 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-watcher-script
+  namespace: default
+data:
+  main.py: |
+    import time
+    import re
+    import datetime
+    import sys
+    from kubernetes import client, config, watch
+    from kubernetes.client.rest import ApiException
+    from prometheus_client import start_http_server, Gauge
+
+    # --- Prometheus Metrics ---
+    PLAYER_ONLINE_STATUS = Gauge(
+        'minecraft_player_online_status',
+        'Current online status of the player (1 for online, 0 for offline)',
+        ['user_name']
+    )
+
+    # --- Log Parsing ---
+    def parse_log_line(line):
+        login_pattern = r"Player (.+) connected"
+        logout_pattern = r"Player (.+) disconnected"
+        
+        match_login = re.search(login_pattern, line)
+        if match_login: return 'LOGIN', match_login.group(1)
+        
+        match_logout = re.search(logout_pattern, line)
+        if match_logout: return 'LOGOUT', match_logout.group(1)
+        
+        return None, None
+
+    # --- K8s Logic ---
+    def get_minecraft_pod(v1, namespace, label_selector):
+        try:
+            pods = v1.list_namespaced_pod(namespace, label_selector=label_selector)
+            for pod in pods.items:
+                if pod.status.phase == "Running": return pod.metadata.name
+        except ApiException as e:
+            print(f"Error listing pods: {e}")
+        return None
+
+    def watch_logs():
+        try:
+            config.load_incluster_config()
+        except Exception:
+            print("Failed to load in-cluster config")
+            sys.exit(1)
+
+        v1 = client.CoreV1Api()
+        w = watch.Watch()
+        NAMESPACE = "default"
+        POD_LABEL_SELECTOR = "app=minecraft-bedrock"
+
+        print("🚀 Minecraft Log Exporter started on port 8000")
+
+        while True:
+            pod_name = get_minecraft_pod(v1, NAMESPACE, POD_LABEL_SELECTOR)
+            if not pod_name:
+                print("⏳ Pod not found. Retrying in 10s...")
+                time.sleep(10)
+                continue
+
+            print(f"TARGET POD: {pod_name}. Streaming...")
+            try:
+                for line in w.stream(v1.read_namespaced_pod_log, name=pod_name, namespace=NAMESPACE, follow=True):
+                    event, user = parse_log_line(line.strip())
+                    if event == 'LOGIN':
+                        print(f"✅ LOGIN: {user}")
+                        PLAYER_ONLINE_STATUS.labels(user_name=user).set(1)
+                    elif event == 'LOGOUT':
+                        print(f"🚪 LOGOUT: {user}")
+                        PLAYER_ONLINE_STATUS.labels(user_name=user).set(0)
+            except Exception as e:
+                print(f"⚠️ Stream Error: {e}. Reconnecting...")
+                time.sleep(5)
+
+    if __name__ == '__main__':
+        start_http_server(8000)
+        watch_logs()
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,21 +98,38 @@ spec:
       labels:
         app: log-watcher
     spec:
-      serviceAccountName: log-watcher-sa # さっき作った権限を使う！
+      serviceAccountName: log-watcher-sa # 以前作成したRBACを使用
       containers:
-        - name: watcher
-          image: python:3.9-slim # 本当は自作イメージビルドが必要
-          # 簡易的にコンテナ起動時にライブラリ入れて実行させる例
-          # 本番ではDockerfileでビルド済みイメージを使ってね！
+        - name: log-watcher
+          image: python:3.9-slim
+          # 起動時にライブラリをインストールしてからスクリプトを実行
           command: ["/bin/sh", "-c"]
-          args:
-            - |
-              pip install kubernetes requests &&
-              python -u /scripts/log_watcher.py
+          args: ["pip install --no-cache-dir kubernetes prometheus-client && python -u /app/main.py"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: TZ
+              value: "Asia/Tokyo"
           volumeMounts:
-            - name: script-vol
-              mountPath: /scripts
+            - name: script-volume
+              mountPath: /app
       volumes:
-        - name: script-vol
+        - name: script-volume
           configMap:
-            name: log-watcher-script # PythonコードをConfigMap化してマウント
+            name: log-watcher-script
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-watcher-svc
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: log-watcher
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30003 # 外部公開ポート
