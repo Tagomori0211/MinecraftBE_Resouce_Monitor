@@ -31,6 +31,28 @@ def query_prometheus(query):
 def hello():
     return jsonify({"message": "Minecraft Monitor API OK", "status": "Running"})
 
+# 【追加】デバッグ用エンドポイント
+# ブラウザで /api/debug にアクセスすると、Prometheusからの生データが見れます
+@app.route('/api/debug')
+def debug_prometheus():
+    results = {}
+    queries = [
+        'minecraft_status_players_online_count',
+        'minecraft_status_players_max_count',
+        'minecraft_status_healthy',
+        'minecraft_status_response_time_seconds',
+        'minecraft_player_online_status' # log-watcherの方も確認
+    ]
+    
+    for q in queries:
+        try:
+            res = requests.get(f"{PROMETHEUS_URL}/api/v1/query", params={'query': q})
+            results[q] = res.json()
+        except Exception as e:
+            results[q] = str(e)
+            
+    return jsonify(results)
+
 @app.route('/api/status')
 def get_status():
     # -------------------------------------------------
@@ -38,38 +60,30 @@ def get_status():
     # -------------------------------------------------
     
     # [A] オンライン人数 (mc-monitor: Port 30001)
-    # 以前のバージョンで動作実績のある mc-monitor の数値を正とします。
-    # Log Watcherは補助的な役割（誰が入ったか等）で使用可能です。
     online_res = query_prometheus('minecraft_status_players_online_count')
     
     # [B] 最大人数 (mc-monitor)
     max_res = query_prometheus('minecraft_status_players_max_count')
     
     # [C] サーバーの健全性とバージョン (mc-monitor)
-    # このメトリクスは {version="1.20.xx", ...} というラベルを持っています。
     healthy_res = query_prometheus('minecraft_status_healthy')
     
     # [D] 応答速度 Ping (mc-monitor)
-    # 秒単位で返ってくるため、後でミリ秒に変換します。
     ping_res = query_prometheus('minecraft_status_response_time_seconds')
 
     # [E] リソース情報 (cAdvisor: Port 30002)
-    # CPU使用率 (%)
     cpu_query = 'sum(rate(container_cpu_usage_seconds_total{container_label_io_kubernetes_container_name="minecraft"}[1m])) * 100'
     cpu_res = query_prometheus(cpu_query)
 
-    # メモリ使用量 (Bytes)
     mem_query = 'sum(container_memory_working_set_bytes{container_label_io_kubernetes_container_name="minecraft"})'
     mem_res = query_prometheus(mem_query)
 
-    # メモリ制限値 (Bytes)
     limit_query = 'sum(container_spec_memory_limit_bytes{container_label_io_kubernetes_container_name="minecraft"})'
     limit_res = query_prometheus(limit_query)
 
     # -------------------------------------------------
     # 2. データの整形
     # -------------------------------------------------
-    # 初期値 (Offline想定)
     players_online = 0
     players_max = 0
     version = "Unknown"
@@ -82,18 +96,16 @@ def get_status():
     mem_percent_str = ""
 
     # --- ステータス判定ロジック ---
-    # minecraft_status_healthy が 1 であればオンラインとみなす
+    # minecraft_status_healthy が 1 であればオンライン
     is_online = False
     
     if healthy_res:
-        # 値を取得 (文字列なのでfloat経由でintへ)
         val = int(float(healthy_res['value'][1]))
         if val == 1:
             is_online = True
             status_text = "Online"
             
-            # バージョン情報の抽出 (Prometheusのラベルから)
-            # mc-monitorのバージョンによってラベルキーが異なる場合があるため安全策を取る
+            # バージョン情報取得
             if 'metric' in healthy_res:
                 version = healthy_res['metric'].get('version', 'Unknown') 
                 if version == 'Unknown':
@@ -101,33 +113,29 @@ def get_status():
 
     # オンライン時の追加データ取得処理
     if is_online:
-        # 人数取得
         if online_res:
             players_online = int(float(online_res['value'][1]))
         
-        # 最大人数
         if max_res:
             players_max = int(float(max_res['value'][1]))
             
-        # Ping (秒 -> ミリ秒変換)
         if ping_res:
             val = float(ping_res['value'][1])
             latency = int(val * 1000)
 
-    # --- リソース整形 (Grafana用データのAPI提供) ---
+    # --- リソース整形 ---
     if cpu_res:
         val = float(cpu_res['value'][1])
         cpu_usage = f"{val:.1f}%"
     
     if mem_res:
         mem_val = float(mem_res['value'][1])
-        mem_usage_str = f"{mem_val / 1048576:.0f} MB" # MB変換
+        mem_usage_str = f"{mem_val / 1048576:.0f} MB"
         
     if limit_res:
         limit_val = float(limit_res['value'][1])
-        mem_limit_str = f"{limit_val / 1073741824:.1f} GB" # GB変換
+        mem_limit_str = f"{limit_val / 1073741824:.1f} GB"
 
-    # メモリ使用率の計算
     if mem_res and limit_res:
         m_val = float(mem_res['value'][1])
         l_val = float(limit_res['value'][1])
@@ -135,9 +143,6 @@ def get_status():
             percent = (m_val / l_val) * 100
             mem_percent_str = f"({percent:.1f}%)"
 
-    # -------------------------------------------------
-    # 3. レスポンス生成
-    # -------------------------------------------------
     return jsonify({
         "status": status_text,
         "players": {
@@ -155,5 +160,4 @@ def get_status():
     })
 
 if __name__ == '__main__':
-    # 開発環境用起動設定 (本番はGunicorn経由)
     app.run(host='0.0.0.0', port=5000)
