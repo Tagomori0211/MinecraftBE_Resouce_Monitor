@@ -7,7 +7,6 @@ data:
   main.py: |
     import time
     import re
-    import datetime
     import sys
     from kubernetes import client, config, watch
     from kubernetes.client.rest import ApiException
@@ -20,16 +19,19 @@ data:
         ['user_name']
     )
 
-    # --- Log Parsing ---
+    # --- Log Parsing Logic (Updated) ---
     def parse_log_line(line):
-        login_pattern = r"Player (.+) connected"
-        logout_pattern = r"Player (.+) disconnected"
+        # Format: Player connected: Name, xuid: ...
+        login_pattern = r"Player connected: (.+), xuid"
+        logout_pattern = r"Player disconnected: (.+), xuid"
         
         match_login = re.search(login_pattern, line)
-        if match_login: return 'LOGIN', match_login.group(1)
+        if match_login: 
+            return 'LOGIN', match_login.group(1).strip()
         
         match_logout = re.search(logout_pattern, line)
-        if match_logout: return 'LOGOUT', match_logout.group(1)
+        if match_logout: 
+            return 'LOGOUT', match_logout.group(1).strip()
         
         return None, None
 
@@ -66,7 +68,7 @@ data:
 
             print(f"TARGET POD: {pod_name}. Streaming...")
             try:
-                # 【重要修正】container="minecraft" を指定
+                # 【重要】コンテナ名 "minecraft" を指定
                 for line in w.stream(v1.read_namespaced_pod_log, name=pod_name, namespace=NAMESPACE, container="minecraft", follow=True):
                     event, user = parse_log_line(line.strip())
                     if event == 'LOGIN':
@@ -103,7 +105,7 @@ spec:
       containers:
         - name: log-watcher
           image: python:3.9-slim
-          # 起動時にライブラリをインストールしてからスクリプトを実行
+          # ライブラリインストールとスクリプト実行
           command: ["/bin/sh", "-c"]
           args: ["pip install --no-cache-dir kubernetes prometheus-client && python -u /app/main.py"]
           ports:
@@ -133,4 +135,4 @@ spec:
     - protocol: TCP
       port: 8000
       targetPort: 8000
-      nodePort: 30003 # 外部公開ポート
+      nodePort: 30003
